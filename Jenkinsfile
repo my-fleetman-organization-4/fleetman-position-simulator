@@ -46,7 +46,9 @@ spec:
       }
       stage('Build') {
          steps {
-            sh '''mvn clean package'''
+             container('maven') {
+                    sh '''mvn clean package'''
+             }
          }
       }
 
