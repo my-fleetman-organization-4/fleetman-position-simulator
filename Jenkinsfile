@@ -1,5 +1,32 @@
 pipeline {
-   agent any
+    agent {
+             kubernetes {
+
+        
+                 
+             yaml """
+apiVersion: v1
+kind: Pod
+spec:
+spec:
+  serviceAccountName: jenkins-sa
+  containers:
+  - name: maven
+    image:  israel452/maven-docker:2.0
+    command:
+    - cat
+    tty: true
+    volumeMounts:
+    - name: docker-sock
+      mountPath: /var/run/docker.sock
+  volumes:
+  - name: docker-sock
+    hostPath:
+      path: /var/run/docker.sock
+
+ """
+         }
+     }
 
    environment {
      // You must set the following environment variables
@@ -25,13 +52,26 @@ pipeline {
 
       stage('Build and Push Image') {
          steps {
-           sh 'docker image build -t ${REPOSITORY_TAG} .'
+           
+
+                           container('maven') {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                  sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker image build -t ${REPOSITORY_TAG} .
+                    docker push ${REPOSITORY_TAG}
+                  '''
+                }
+            }
          }
+         
       }
 
       stage('Deploy to Cluster') {
           steps {
+             container('maven') {
                     sh 'envsubst < ${WORKSPACE}/deploy.yaml | kubectl apply -f -'
+             }
           }
       }
    }
